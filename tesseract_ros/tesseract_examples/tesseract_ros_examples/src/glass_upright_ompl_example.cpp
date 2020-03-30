@@ -41,6 +41,8 @@ TESSERACT_COMMON_IGNORE_WARNINGS_POP
 #include <tesseract_motion_planners/ompl/ompl_motion_planner.h>
 #include <tesseract_motion_planners/trajopt/config/utils.h>
 #include <tesseract_motion_planners/ompl/config/ompl_planner_constrained_config.h>
+#include <tesseract_motion_planners/ompl/new_RRTConnect_planner.h>
+
 
 using namespace trajopt;
 using namespace tesseract;
@@ -48,6 +50,7 @@ using namespace tesseract_environment;
 using namespace tesseract_scene_graph;
 using namespace tesseract_collision;
 using namespace tesseract_rosutils;
+using namespace tesseract_motion_planners;
 
 const std::string ROBOT_DESCRIPTION_PARAM = "robot_description"; /**< Default ROS parameter for robot description */
 const std::string ROBOT_SEMANTIC_PARAM = "robot_description_semantic"; /**< Default ROS parameter for robot
@@ -178,8 +181,8 @@ private:
 class GlassUprightConstraint : public ompl::base::Constraint
 {
 public:
-  GlassUprightConstraint(const Eigen::Vector3d& normal, tesseract_kinematics::ForwardKinematics::Ptr fwd_kin)
-    : ompl::base::Constraint(fwd_kin->numJoints(), 1), normal_(normal.normalized()), fwd_kin_(std::move(fwd_kin))
+  GlassUprightConstraint(const Eigen::Vector3d& normal, tesseract_kinematics::ForwardKinematics::Ptr fwd_kin, OMPLStateExtractor extractor)
+    : ompl::base::Constraint(fwd_kin->numJoints(), 1), normal_(normal.normalized()), fwd_kin_(std::move(fwd_kin)), extractor_(std::move(extractor))
   {
   }
 
@@ -195,9 +198,16 @@ public:
     out[0] = std::atan2(z_axis.cross(normal_).norm(), z_axis.dot(normal_));
   }
 
+  bool project(ompl::base::State *state) const override
+  {
+     Eigen::Map<Eigen::VectorXd> s = extractor_(state);
+     return ompl::base::Constraint::project(s);
+  }
+
 private:
   Eigen::Vector3d normal_;
   tesseract_kinematics::ForwardKinematics::Ptr fwd_kin_;
+  OMPLStateExtractor extractor_;
 };
 
 GlassUprightOMPLExample::GlassUprightOMPLExample(const ros::NodeHandle& nh,
@@ -285,10 +295,33 @@ bool GlassUprightOMPLExample::run()
   util::gLogLevel = util::LevelError;
 
   // Setup Problem
+  auto rrtconnect_planner = std::make_shared<tesseract_motion_planners::NewRRTConnectConfigurator>();
+  rrtconnect_planner->range = range_;
+  OMPLStateExtractor extractor;
+  extractor = std::bind(&tesseract_motion_planners::RealVectorStateSpaceExtractor, std::placeholders::_1, kin->numJoints());
+//  if (use_trajopt_constraint_)
+//  {
+//    if (plotting_)
+//      ompl_config->constraint =
+//          std::make_shared<TrajOptGlassUprightConstraint>(tesseract_, kin, "manipulator", "tool0", plotter);
+//    else
+//      ompl_config->constraint =
+//          std::make_shared<TrajOptGlassUprightConstraint>(tesseract_, kin, "manipulator", "tool0", nullptr);
+//  }
+//  else
+//  {
+    Eigen::Vector3d normal = -1.0 * Eigen::Vector3d::UnitZ();
+    rrtconnect_planner->constraint = std::make_shared<GlassUprightConstraint>(normal, kin, extractor);
+//  }
+
+  std::vector<tesseract_motion_planners::OMPLPlannerConfigurator::ConstPtr> planners;
+  planners.push_back(rrtconnect_planner);
+  auto ompl_config = std::make_shared<OMPLPlannerFreespaceConfig>(tesseract_, "manipulator", planners);
+
+//  ompl_config->planners.push_back(rrtconnect_planner);
+
   tesseract_motion_planners::OMPLMotionPlanner ompl_planner;
 
-  auto ompl_config =
-      std::make_shared<tesseract_motion_planners::OMPLPlannerConstrainedConfig>(tesseract_, "manipulator");
 
   ompl_config->start_waypoint = std::make_shared<tesseract_motion_planners::JointWaypoint>(swp, kin->getJointNames());
   ompl_config->end_waypoint = std::make_shared<tesseract_motion_planners::JointWaypoint>(ewp, kin->getJointNames());
@@ -302,27 +335,8 @@ bool GlassUprightOMPLExample::run()
   ompl_config->simplify = false;
   ompl_config->n_output_states = 50;
 
-  if (use_trajopt_constraint_)
-  {
-    if (plotting_)
-      ompl_config->constraint =
-          std::make_shared<TrajOptGlassUprightConstraint>(tesseract_, kin, "manipulator", "tool0", plotter);
-    else
-      ompl_config->constraint =
-          std::make_shared<TrajOptGlassUprightConstraint>(tesseract_, kin, "manipulator", "tool0", nullptr);
-  }
-  else
-  {
-    Eigen::Vector3d normal = -1.0 * Eigen::Vector3d::UnitZ();
-    ompl_config->constraint = std::make_shared<GlassUprightConstraint>(normal, kin);
-  }
 
-  for (int i = 0; i < 4; ++i)
-  {
-    auto rrtconnect_planner = std::make_shared<tesseract_motion_planners::ESTConfigurator>();
-    rrtconnect_planner->range = range_;
-    ompl_config->planners.push_back(rrtconnect_planner);
-  }
+
 
   // Set the planner configuration
   ompl_planner.setConfiguration(ompl_config);
