@@ -295,8 +295,7 @@ bool GlassUprightOMPLExample::run()
   util::gLogLevel = util::LevelError;
 
   // Setup Problem
-  auto rrtconnect_planner = std::make_shared<tesseract_motion_planners::NewRRTConnectConfigurator>();
-  rrtconnect_planner->range = range_;
+  std::vector<tesseract_motion_planners::OMPLPlannerConfigurator::ConstPtr> planners;
   OMPLStateExtractor extractor;
   extractor = std::bind(&tesseract_motion_planners::RealVectorStateSpaceExtractor, std::placeholders::_1, kin->numJoints());
 //  if (use_trajopt_constraint_)
@@ -310,12 +309,17 @@ bool GlassUprightOMPLExample::run()
 //  }
 //  else
 //  {
-    Eigen::Vector3d normal = -1.0 * Eigen::Vector3d::UnitZ();
-    rrtconnect_planner->constraint = std::make_shared<GlassUprightConstraint>(normal, kin, extractor);
 //  }
 
-  std::vector<tesseract_motion_planners::OMPLPlannerConfigurator::ConstPtr> planners;
-  planners.push_back(rrtconnect_planner);
+    Eigen::Vector3d normal = -1.0 * Eigen::Vector3d::UnitZ();
+    for (int i = 0; i < 4; ++i)
+    {
+      auto rrtconnect_planner = std::make_shared<tesseract_motion_planners::NewRRTConnectConfigurator>();
+      rrtconnect_planner->range = range_;
+      rrtconnect_planner->constraint = std::make_shared<GlassUprightConstraint>(normal, kin, extractor);
+      planners.push_back(rrtconnect_planner);
+    }
+
   auto ompl_config = std::make_shared<OMPLPlannerFreespaceConfig>(tesseract_, "manipulator", planners);
 
 //  ompl_config->planners.push_back(rrtconnect_planner);
