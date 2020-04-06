@@ -41,6 +41,7 @@ TESSERACT_COMMON_IGNORE_WARNINGS_POP
 #include <tesseract_motion_planners/ompl/ompl_motion_planner.h>
 #include <tesseract_motion_planners/trajopt/config/utils.h>
 #include <tesseract_motion_planners/ompl/config/ompl_planner_constrained_config.h>
+#include <tesseract_motion_planners/ompl/new_RRTConnect_planner.h>
 
 using namespace trajopt;
 using namespace tesseract;
