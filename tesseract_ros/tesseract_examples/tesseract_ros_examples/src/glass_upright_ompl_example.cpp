@@ -69,13 +69,15 @@ public:
                                 tesseract_kinematics::ForwardKinematics::Ptr fwd_kin,
                                 std::string manipulator,
                                 std::string tcp_link,
-                                tesseract_rosutils::ROSPlottingPtr plotter)
+                                tesseract_rosutils::ROSPlottingPtr plotter,
+                                OMPLStateExtractor extractor)
     : ompl::base::Constraint(fwd_kin->numJoints(), 1)
     , tesseract_(std::move(tesseract))
     , fwd_kin_(std::move(fwd_kin))
     , manipulator_(std::move(manipulator))
     , tcp_link_(std::move(tcp_link))
     , plotter_(plotter)
+    , extractor_(std::move(extractor))
   {
     util::gLogLevel = util::LevelError;
   }
@@ -87,8 +89,15 @@ public:
     assert(false);
   }
 
-  virtual bool project(Eigen::Ref<Eigen::VectorXd> x) const override
+//  bool project(ompl::base::State *state) const override
+//  {
+//     Eigen::Map<Eigen::VectorXd> s = extractor_(state);
+//     return project_(s);
+//  }
+
+  virtual bool project_(Eigen::Ref<Eigen::VectorXd> x) const
   {
+    ROS_INFO("IN TRAJOPT PROJECT!!!!!!!!!!!!!!!!!!!!!!!!");
     trajopt::ProblemConstructionInfo pci(tesseract_);
     pci.basic_info.n_steps = 1;
     pci.basic_info.manip = manipulator_;
@@ -161,9 +170,9 @@ public:
     return true;
   }
 
-  bool isSatisfied(const Eigen::Ref<const Eigen::VectorXd>& /*x*/) const override { assert(false); }
+//  bool isSatisfied(const Eigen::Ref<const Eigen::VectorXd>& /*x*/) const override { assert(false); }
 
-  double distance(const Eigen::Ref<const Eigen::VectorXd>& /*x*/) const override { assert(false); }
+//  double distance(const Eigen::Ref<const Eigen::VectorXd>& /*x*/) const override { assert(false); }
 
   void jacobian(const Eigen::Ref<const Eigen::VectorXd>& /*x*/, Eigen::Ref<Eigen::MatrixXd> /*out*/) const override
   {
@@ -176,6 +185,7 @@ private:
   std::string manipulator_;
   std::string tcp_link_;
   tesseract_rosutils::ROSPlottingPtr plotter_;
+  OMPLStateExtractor extractor_;
 };
 
 class GlassUprightConstraint : public ompl::base::Constraint
@@ -298,31 +308,29 @@ bool GlassUprightOMPLExample::run()
   std::vector<tesseract_motion_planners::OMPLPlannerConfigurator::ConstPtr> planners;
   OMPLStateExtractor extractor;
   extractor = std::bind(&tesseract_motion_planners::RealVectorStateSpaceExtractor, std::placeholders::_1, kin->numJoints());
-//  if (use_trajopt_constraint_)
-//  {
-//    if (plotting_)
-//      ompl_config->constraint =
-//          std::make_shared<TrajOptGlassUprightConstraint>(tesseract_, kin, "manipulator", "tool0", plotter);
-//    else
-//      ompl_config->constraint =
-//          std::make_shared<TrajOptGlassUprightConstraint>(tesseract_, kin, "manipulator", "tool0", nullptr);
-//  }
-//  else
-//  {
-//  }
 
-    Eigen::Vector3d normal = -1.0 * Eigen::Vector3d::UnitZ();
-    for (int i = 0; i < 4; ++i)
+  for (int i = 0; i < 4; ++i)
+  {
+    auto rrtconnect_planner = std::make_shared<tesseract_motion_planners::NewRRTConnectConfigurator>();
+    rrtconnect_planner->range = range_;
+    if (use_trajopt_constraint_)
     {
-      auto rrtconnect_planner = std::make_shared<tesseract_motion_planners::NewRRTConnectConfigurator>();
-      rrtconnect_planner->range = range_;
-      rrtconnect_planner->constraint = std::make_shared<GlassUprightConstraint>(normal, kin, extractor);
-      planners.push_back(rrtconnect_planner);
+      if (plotting_)
+        rrtconnect_planner->constraint =
+            std::make_shared<TrajOptGlassUprightConstraint>(tesseract_, kin, "manipulator", "tool0", plotter, extractor);
+      else
+        rrtconnect_planner->constraint =
+            std::make_shared<TrajOptGlassUprightConstraint>(tesseract_, kin, "manipulator", "tool0", nullptr, extractor);
     }
+    else
+    {
+      Eigen::Vector3d normal = -1.0 * Eigen::Vector3d::UnitZ();
+      rrtconnect_planner->constraint = std::make_shared<GlassUprightConstraint>(normal, kin, extractor);
+    }
+    planners.push_back(rrtconnect_planner);
+  }
 
   auto ompl_config = std::make_shared<OMPLPlannerFreespaceConfig>(tesseract_, "manipulator", planners);
-
-//  ompl_config->planners.push_back(rrtconnect_planner);
 
   tesseract_motion_planners::OMPLMotionPlanner ompl_planner;
 
@@ -335,11 +343,9 @@ bool GlassUprightOMPLExample::run()
   ompl_config->longest_valid_segment_fraction = 0.01;
 
   ompl_config->collision_continuous = false;
-  ompl_config->collision_check = false;
+  ompl_config->collision_check = true;
   ompl_config->simplify = false;
   ompl_config->n_output_states = 50;
-
-
 
 
   // Set the planner configuration
