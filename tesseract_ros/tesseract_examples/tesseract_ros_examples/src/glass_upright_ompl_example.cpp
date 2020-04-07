@@ -170,9 +170,17 @@ public:
     return true;
   }
 
-//  bool isSatisfied(const Eigen::Ref<const Eigen::VectorXd>& /*x*/) const override { assert(false); }
+  bool isSatisfied(const Eigen::Ref<const Eigen::VectorXd>& /*x*/) const override
+  {
+    assert(false);
+    return false;
+  }
 
-//  double distance(const Eigen::Ref<const Eigen::VectorXd>& /*x*/) const override { assert(false); }
+  double distance(const Eigen::Ref<const Eigen::VectorXd>& /*x*/) const override
+  {
+    assert(false);
+    return 0;
+  }
 
   void jacobian(const Eigen::Ref<const Eigen::VectorXd>& /*x*/, Eigen::Ref<Eigen::MatrixXd> /*out*/) const override
   {
@@ -380,7 +388,7 @@ bool GlassUprightOMPLExample::run()
     tesseract_environment::StateSolver::Ptr state_solver = env->getStateSolver();
     ContinuousContactManager::Ptr manager = env->getContinuousContactManager();
     AdjacencyMap::Ptr adjacency_map = std::make_shared<tesseract_environment::AdjacencyMap>(
-        env->getSceneGraph(), env->getActiveLinkNames(), env->getCurrentState()->transforms);
+        env->getSceneGraph(), env->getActiveLinkNames(), env->getCurrentState()->link_transforms);
 
     manager->setActiveCollisionObjects(adjacency_map->getActiveLinkNames());
     manager->setContactDistanceThreshold(0);
