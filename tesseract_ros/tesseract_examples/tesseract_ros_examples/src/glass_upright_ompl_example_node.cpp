@@ -47,6 +47,6 @@ int main(int argc, char** argv)
   pnh.param("use_trajopt_constraint", use_trajopt_constraint, use_trajopt_constraint);
   pnh.param("planning_time", planning_time, planning_time);
 
-  GlassUprightOMPLExample example(nh, plotting, rviz, range, use_trajopt_constraint, planning_time);
+  GlassUprightOMPLExample example(nh, plotting, rviz, range, true, planning_time);
   example.run();
 }
