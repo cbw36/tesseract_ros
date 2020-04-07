@@ -89,15 +89,14 @@ public:
     assert(false);
   }
 
-//  bool project(ompl::base::State *state) const override
-//  {
-//     Eigen::Map<Eigen::VectorXd> s = extractor_(state);
-//     return project_(s);
-//  }
+  bool project(ompl::base::State *state) const override
+  {
+     Eigen::Map<Eigen::VectorXd> s = extractor_(state);
+     return project_(s);
+  }
 
   virtual bool project_(Eigen::Ref<Eigen::VectorXd> x) const
   {
-    ROS_INFO("IN TRAJOPT PROJECT!!!!!!!!!!!!!!!!!!!!!!!!");
     trajopt::ProblemConstructionInfo pci(tesseract_);
     pci.basic_info.n_steps = 1;
     pci.basic_info.manip = manipulator_;
