@@ -36,10 +36,14 @@ add_message_files(
     AllowedCollisionEntry.msg
     ChainGroup.msg
     CollisionGeometry.msg
+    CollisionMarginData.msg
+    CollisionMarginOverrideType.msg
     ContactMarginPair.msg
     ContactResult.msg
     ContactResultVector.msg
+    Environment.msg
     EnvironmentCommand.msg
+    EnvironmentState.msg
     Geometry.msg
     GroupsJointState.msg
     GroupsJointStates.msg
@@ -74,8 +78,7 @@ add_message_files(
     StringDoublePair.msg
     StringLimitsPair.msg
     StringPair.msg
-    TesseractState.msg
-    Tesseract.msg
+    TaskInfo.msg
     Trajectory.msg
     TransformMap.msg
     VisualGeometry.msg

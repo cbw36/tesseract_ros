@@ -19,7 +19,7 @@ jobs:
       ROS_DISTRO: noetic
       ROS_REPO: main
       UPSTREAM_WORKSPACE: 'dependencies.rosinstall'
-      ROSDEP_SKIP_KEYS: "bullet bullet-extras cmake_common_scripts fcl iwyu taskflow"
+      ROSDEP_SKIP_KEYS: "bullet bullet-extras ros_industrial_cmake_boilerplate fcl iwyu taskflow"
       DOCKER_IMAGE: "rosindustrial/tesseract:noetic"
       CCACHE_DIR: "/home/runner/work/tesseract_ros/tesseract_ros/Clang-Tidy/.ccache"
       NOT_TEST_BUILD: true
@@ -29,6 +29,7 @@ jobs:
       - uses: actions/checkout@v1
 
       - name: Free Disk Space
+        continue-on-error: true
         run: |
           sudo swapoff -a
           sudo rm -f /swapfile
@@ -44,6 +45,7 @@ jobs:
           message("::set-output name=timestamp::${current_date}")
 
       - name: ccache cache files
+        continue-on-error: true
         uses: actions/cache@v1.1.0
         with:
           path: ${{ env.CI_NAME }}/.ccache

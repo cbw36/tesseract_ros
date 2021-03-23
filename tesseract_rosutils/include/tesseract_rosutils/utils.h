@@ -60,8 +60,9 @@ TESSERACT_COMMON_IGNORE_WARNINGS_PUSH
 #include <tesseract_msgs/SceneGraph.h>
 #include <tesseract_msgs/StringDoublePair.h>
 #include <tesseract_msgs/StringPair.h>
-#include <tesseract_msgs/Tesseract.h>
-#include <tesseract_msgs/TesseractState.h>
+#include <tesseract_msgs/Environment.h>
+#include <tesseract_msgs/EnvironmentState.h>
+#include <tesseract_msgs/TaskInfo.h>
 #include <tesseract_msgs/Trajectory.h>
 #include <tesseract_msgs/TransformMap.h>
 #include <tesseract_msgs/VisualGeometry.h>
@@ -83,6 +84,7 @@ TESSERACT_COMMON_IGNORE_WARNINGS_POP
 #include <tesseract_collision/core/common.h>
 #include <tesseract_common/types.h>
 #include <tesseract_motion_planners/core/types.h>
+#include <tesseract_process_managers/core/task_info.h>
 
 namespace tesseract_rosutils
 {
@@ -164,11 +166,18 @@ tesseract_planning::PlannerProfileRemapping
 fromMsg(const tesseract_msgs::PlannerProfileRemapping& profile_remapping_msg);
 tesseract_msgs::PlannerProfileRemapping toMsg(const tesseract_planning::PlannerProfileRemapping& profile_remapping);
 
-std::unordered_map<tesseract_common::LinkNamesPair, double, tesseract_common::PairHash>
+tesseract_common::PairsCollisionMarginData
 fromMsg(const std::vector<tesseract_msgs::ContactMarginPair>& contact_margin_pairs_msg);
 std::vector<tesseract_msgs::ContactMarginPair>
-toMsg(const std::unordered_map<tesseract_common::LinkNamesPair, double, tesseract_common::PairHash>&
-          contact_margin_pairs);
+toMsg(const tesseract_common::PairsCollisionMarginData& contact_margin_pairs);
+
+tesseract_common::CollisionMarginData fromMsg(const tesseract_msgs::CollisionMarginData& contact_margin_data_msg);
+tesseract_msgs::CollisionMarginData toMsg(const tesseract_common::CollisionMarginData& contact_margin_data);
+
+tesseract_common::CollisionMarginOverrideType
+fromMsg(const tesseract_msgs::CollisionMarginOverrideType& contact_margin_override_type_msg);
+tesseract_msgs::CollisionMarginOverrideType
+toMsg(const tesseract_common::CollisionMarginOverrideType& contact_margin_override_type);
 
 tesseract_scene_graph::Joint fromMsg(const tesseract_msgs::Joint& joint_msg);
 
@@ -195,11 +204,11 @@ bool toMsg(std::vector<tesseract_msgs::EnvironmentCommand>& commands_msg,
            const tesseract_environment::Commands& commands,
            unsigned long past_revision);
 
-void toMsg(tesseract_msgs::TesseractState& state_msg,
+void toMsg(tesseract_msgs::EnvironmentState& state_msg,
            const tesseract_environment::Environment& env,
            bool include_joint_states = true);
 
-void toMsg(const tesseract_msgs::TesseractStatePtr& state_msg, const tesseract_environment::Environment& env);
+void toMsg(const tesseract_msgs::EnvironmentStatePtr& state_msg, const tesseract_environment::Environment& env);
 
 /**
  * @brief Generate a JointTrajectory Message that contains only trajectory joints
@@ -356,16 +365,45 @@ bool fromMsg(std::unordered_map<std::string, double>& joint_state, const sensor_
  * @brief Converts a Environment object to a Tesseract msg
  * @param tesseract_msg Resulting Message
  * @param env Input Environment object
+ * @param include_joint_states If true, the joint_states element will be populated with the current state
  * @return True if successful, otherwise false
  */
-bool toMsg(tesseract_msgs::Tesseract& tesseract_msg, const tesseract_environment::Environment::ConstPtr& env);
+bool toMsg(tesseract_msgs::Environment& environment_msg,
+           const tesseract_environment::Environment& env,
+           bool include_joint_states = true);
+
+/**
+ * @brief Converts a Environment object to a Tesseract msg
+ * @param tesseract_msg Resulting Message
+ * @param env Input Environment object
+ * @param include_joint_states If true, the joint_states element will be populated with the current state
+ * @return True if successful, otherwise false
+ */
+bool toMsg(tesseract_msgs::Environment& environment_msg,
+           const tesseract_environment::Environment::ConstPtr& env,
+           bool include_joint_states = true);
 
 /**
  * @brief Converts a Tesseract msg to a Environment object
  * @param tesseract_msg Input Tesseract msg
  * @return Resulting Tesseract Object if successful, nullptr otherwise
  */
-tesseract_environment::Environment::Ptr fromMsg(const tesseract_msgs::Tesseract& tesseract_msg);
+tesseract_environment::Environment::Ptr fromMsg(const tesseract_msgs::Environment& environment_msg);
+
+/**
+ * @brief Converts a TaskInfo object to a TaskInfo msg
+ * @param task_info_msg Resulting message
+ * @param task_info TaskInfo object
+ * @return True if successful, otherwise false
+ */
+bool toMsg(tesseract_msgs::TaskInfo& task_info_msg, tesseract_planning::TaskInfo::ConstPtr task_info);
+
+/**
+ * @brief Converts a TaskInfo msg to a TaskInfo object
+ * @param task_info_msg Input TaskInfo msg
+ * @return Resulting Tesseract Object if successful, nullptr otherwise
+ */
+tesseract_planning::TaskInfo::Ptr fromMsg(const tesseract_msgs::TaskInfo& task_info_msg);
 
 template <typename MessageType>
 inline bool toFile(const std::string& filepath, const MessageType& msg)

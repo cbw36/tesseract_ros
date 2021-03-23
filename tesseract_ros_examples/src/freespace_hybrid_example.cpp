@@ -34,11 +34,11 @@ TESSERACT_COMMON_IGNORE_WARNINGS_POP
 #include <tesseract_rosutils/plotting.h>
 #include <tesseract_rosutils/utils.h>
 #include <tesseract_command_language/command_language.h>
+#include <tesseract_command_language/profile_dictionary.h>
 #include <tesseract_command_language/utils/utils.h>
 #include <tesseract_process_managers/taskflow_generators/freespace_taskflow.h>
 #include <tesseract_planning_server/tesseract_planning_server.h>
 #include <tesseract_motion_planners/ompl/profile/ompl_default_plan_profile.h>
-#include <tesseract_motion_planners/core/profile_dictionary.h>
 #include <tesseract_motion_planners/core/utils.h>
 #include <tesseract_visualization/markers/toolpath_marker.h>
 
@@ -72,25 +72,25 @@ FreespaceHybridExample::FreespaceHybridExample(const ros::NodeHandle& nh,
 Command::Ptr FreespaceHybridExample::addSphere()
 {
   // Add sphere to environment
-  auto link_sphere = std::make_shared<Link>("sphere_attached");
+  Link link_sphere("sphere_attached");
 
   Visual::Ptr visual = std::make_shared<Visual>();
   visual->origin = Eigen::Isometry3d::Identity();
   visual->origin.translation() = Eigen::Vector3d(0.5, 0, 0.55);
   visual->geometry = std::make_shared<tesseract_geometry::Sphere>(0.15);
-  link_sphere->visual.push_back(visual);
+  link_sphere.visual.push_back(visual);
 
   Collision::Ptr collision = std::make_shared<Collision>();
   collision->origin = visual->origin;
   collision->geometry = visual->geometry;
-  link_sphere->collision.push_back(collision);
+  link_sphere.collision.push_back(collision);
 
-  auto joint_sphere = std::make_shared<Joint>("joint_sphere_attached");
-  joint_sphere->parent_link_name = "base_link";
-  joint_sphere->child_link_name = link_sphere->getName();
-  joint_sphere->type = JointType::FIXED;
+  Joint joint_sphere("joint_sphere_attached");
+  joint_sphere.parent_link_name = "base_link";
+  joint_sphere.child_link_name = link_sphere.getName();
+  joint_sphere.type = JointType::FIXED;
 
-  return std::make_shared<tesseract_environment::AddCommand>(link_sphere, joint_sphere);
+  return std::make_shared<tesseract_environment::AddLinkCommand>(link_sphere, joint_sphere);
 }
 
 bool FreespaceHybridExample::run()
@@ -125,7 +125,7 @@ bool FreespaceHybridExample::run()
 
   // Add sphere to environment
   Command::Ptr cmd = addSphere();
-  if (!monitor_->applyCommand(*cmd))
+  if (!monitor_->applyCommand(cmd))
     return false;
 
   // Create plotting tool

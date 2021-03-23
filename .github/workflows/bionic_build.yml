@@ -19,7 +19,7 @@ jobs:
       ROS_DISTRO: melodic
       ROS_REPO: main
       UPSTREAM_WORKSPACE: 'dependencies_with_ext.rosinstall'
-      ROSDEP_SKIP_KEYS: "bullet bullet-extras cmake_common_scripts fcl iwyu taskflow"
+      ROSDEP_SKIP_KEYS: "bullet bullet-extras ros_industrial_cmake_boilerplate fcl iwyu taskflow"
       DOCKER_IMAGE: "rosindustrial/tesseract:melodic"
       PARALLEL_TESTS: false
       CCACHE_DIR: "/home/runner/work/tesseract_ros/tesseract_ros/Bionic-Build/.ccache"
@@ -29,6 +29,7 @@ jobs:
       - uses: actions/checkout@v1
 
       - name: Free Disk Space
+        continue-on-error: true
         run: |
           sudo swapoff -a
           sudo rm -f /swapfile
@@ -44,6 +45,7 @@ jobs:
           message("::set-output name=timestamp::${current_date}")
 
       - name: ccache cache files
+        continue-on-error: true
         uses: actions/cache@v1.1.0
         with:
           path: ${{ env.CI_NAME }}/.ccache

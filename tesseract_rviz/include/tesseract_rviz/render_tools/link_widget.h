@@ -140,12 +140,21 @@ public:
 
   /**
    * @brief Set trajectory for the link
+   * @details With large trajectories maintaining the scene nodes is expensive if not being used.
+   * This method no longer creates the scene nodes and just stores the trajectory.
+   * The showTrajectory will create the scene nodes and clearTrajectory destroys them.
    * @param trajectory
    */
-  virtual void setTrajectory(const std::vector<Eigen::Isometry3d>& trajectory);
+  virtual void setTrajectory(const tesseract_common::VectorIsometry3d& trajectory);
+
+  /** @brief Show trajectory by creating visualization for the trajectory */
+  virtual void showTrajectory();
+
+  /** @brief Remove/destroy visual scene nodes for the trajectory */
+  virtual void clearTrajectory();
 
   /** @brief Hide trajectory */
-  virtual void clearTrajectory();
+  virtual void hideTrajectory();
 
   // This is usefule when wanting to simulate the trajectory
   virtual void showTrajectoryWaypointOnly(int waypoint);
@@ -263,13 +272,14 @@ protected:
   rviz::FloatProperty* alpha_property_;
   rviz::StringProperty* collision_enabled_property_;
   rviz::Property* allowed_collision_matrix_property_;
+  std::map<std::string, rviz::StringProperty*> acm_;
 
 private:
   typedef std::map<Ogre::SubEntity*, Ogre::MaterialPtr> M_SubEntityToMaterial;
   M_SubEntityToMaterial materials_;
   Ogre::MaterialPtr default_material_;
   std::string default_material_name_;
-  std::map<std::string, rviz::StringProperty*> acm_;
+  tesseract_common::VectorIsometry3d trajectory_;
 
   std::vector<Ogre::Entity*> visual_current_meshes_;     ///< The entities representing the visual mesh of this link (if
                                                          ///< they
@@ -347,7 +357,7 @@ private:
 
   Ogre::RibbonTrail* trail_;
 
-  rviz::Axes* axes_;
+  std::unique_ptr<rviz::Axes> axes_;
 
   float material_alpha_;  ///< If material is not a texture, this saves the alpha value set in the URDF, otherwise is
                           /// 1.0.

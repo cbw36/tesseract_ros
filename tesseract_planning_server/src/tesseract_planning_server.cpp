@@ -49,6 +49,7 @@ TESSERACT_COMMON_IGNORE_WARNINGS_POP
 #include <tesseract_command_language/serialize.h>
 
 #include <tesseract_rosutils/utils.h>
+#include <tesseract_common/timer.h>
 
 using tesseract_rosutils::processMsg;
 
@@ -120,6 +121,7 @@ tesseract_environment::Environment::Ptr ROSProcessEnvironmentCache::getCachedEnv
 
 TesseractPlanningServer::TesseractPlanningServer(const std::string& robot_description,
                                                  std::string name,
+                                                 size_t n,
                                                  std::string discrete_plugin,
                                                  std::string continuous_plugin)
   : nh_("~")
@@ -128,7 +130,7 @@ TesseractPlanningServer::TesseractPlanningServer(const std::string& robot_descri
                                                                             discrete_plugin,
                                                                             continuous_plugin))
   , environment_cache_(std::make_shared<ROSProcessEnvironmentCache>(environment_))
-  , planning_server_(std::make_shared<tesseract_planning::ProcessPlanningServer>(environment_cache_))
+  , planning_server_(std::make_shared<tesseract_planning::ProcessPlanningServer>(environment_cache_, n))
   , motion_plan_server_(nh_,
                         DEFAULT_GET_MOTION_PLAN_ACTION,
                         boost::bind(&TesseractPlanningServer::onMotionPlanningCallback, this, _1),
@@ -141,13 +143,14 @@ TesseractPlanningServer::TesseractPlanningServer(const std::string& robot_descri
 
 TesseractPlanningServer::TesseractPlanningServer(tesseract_environment::Environment::Ptr env,
                                                  std::string name,
+                                                 size_t n,
                                                  std::string discrete_plugin,
                                                  std::string continuous_plugin)
   : nh_("~")
   , environment_(
         std::make_shared<tesseract_monitoring::EnvironmentMonitor>(env, name, discrete_plugin, continuous_plugin))
   , environment_cache_(std::make_shared<ROSProcessEnvironmentCache>(environment_))
-  , planning_server_(std::make_shared<tesseract_planning::ProcessPlanningServer>(environment_cache_))
+  , planning_server_(std::make_shared<tesseract_planning::ProcessPlanningServer>(environment_cache_, n))
   , motion_plan_server_(nh_,
                         DEFAULT_GET_MOTION_PLAN_ACTION,
                         boost::bind(&TesseractPlanningServer::onMotionPlanningCallback, this, _1),
@@ -209,13 +212,15 @@ void TesseractPlanningServer::onMotionPlanningCallback(const tesseract_msgs::Get
 
   tesseract_planning::ProcessPlanningRequest process_request;
   process_request.name = goal->request.name;
-  process_request.instructions = tesseract_planning::fromXMLString(goal->request.instructions);
+  process_request.instructions = tesseract_planning::fromXMLString<tesseract_planning::Instruction>(
+      goal->request.instructions, tesseract_planning::defaultInstructionParser);
 
   if (!goal->request.seed.empty())
-    process_request.seed = tesseract_planning::fromXMLString(goal->request.seed);
+    process_request.seed = tesseract_planning::fromXMLString<tesseract_planning::Instruction>(
+        goal->request.seed, tesseract_planning::defaultInstructionParser);
 
   auto env_state = std::make_shared<tesseract_environment::EnvState>();
-  tesseract_rosutils::fromMsg(env_state->joints, goal->request.tesseract_state.joint_state);
+  tesseract_rosutils::fromMsg(env_state->joints, goal->request.environment_state.joint_state);
 
   process_request.env_state = env_state;
   process_request.commands = tesseract_rosutils::fromMsg(goal->request.commands);
@@ -223,14 +228,17 @@ void TesseractPlanningServer::onMotionPlanningCallback(const tesseract_msgs::Get
   process_request.plan_profile_remapping = tesseract_rosutils::fromMsg(goal->request.plan_profile_remapping);
   process_request.composite_profile_remapping = tesseract_rosutils::fromMsg(goal->request.composite_profile_remapping);
 
+  tesseract_common::Timer timer;
+  timer.start();
   tesseract_planning::ProcessPlanningFuture plan_future = planning_server_->run(process_request);
   plan_future.wait();  // Wait for results
+  timer.stop();
 
   result.response.successful = plan_future.interface->isSuccessful();
   result.response.results = tesseract_planning::toXMLString(*(plan_future.results));
   plan_future.clear();
 
-  ROS_INFO("Tesseract Planning Server Finished Request!");
+  ROS_INFO("Tesseract Planning Server Finished Request in %f seconds!", timer.elapsedSeconds());
   motion_plan_server_.setSucceeded(result);
 }
 

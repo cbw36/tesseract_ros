@@ -282,7 +282,7 @@ bool EnvironmentMonitor::initialize()
 
 const std::string& EnvironmentMonitor::getName() const { return monitor_namespace_; }
 
-bool EnvironmentMonitor::applyCommand(const tesseract_environment::Command& command)
+bool EnvironmentMonitor::applyCommand(const tesseract_environment::Command::ConstPtr& command)
 {
   bool result = false;
   {
@@ -294,17 +294,6 @@ bool EnvironmentMonitor::applyCommand(const tesseract_environment::Command& comm
 }
 
 bool EnvironmentMonitor::applyCommands(const tesseract_environment::Commands& commands)
-{
-  bool result = false;
-  {
-    auto lock = lockEnvironmentWrite();
-    result = env_->applyCommands(commands);
-  }
-  triggerEnvironmentUpdateEvent(UPDATE_ENVIRONMENT);
-  return result;
-}
-
-bool EnvironmentMonitor::applyCommands(const std::vector<tesseract_environment::Command>& commands)
 {
   bool result = false;
   {
@@ -346,7 +335,7 @@ void EnvironmentMonitor::startPublishingEnvironment(EnvironmentUpdateType update
   if (!publish_environment_ && env_->isInitialized())
   {
     std::string environment_topic = R"(/)" + monitor_namespace_ + DEFAULT_PUBLISH_ENVIRONMENT_TOPIC;
-    environment_publisher_ = nh_.advertise<tesseract_msgs::TesseractState>(environment_topic, 100, false);
+    environment_publisher_ = nh_.advertise<tesseract_msgs::EnvironmentState>(environment_topic, 100, false);
     ROS_INFO_NAMED(monitor_namespace_, "Publishing maintained environment on '%s'", environment_topic.c_str());
     publish_environment_ =
         std::make_unique<std::thread>(std::bind(&EnvironmentMonitor::environmentPublishingThread, this));
@@ -360,7 +349,7 @@ void EnvironmentMonitor::environmentPublishingThread()
   ROS_DEBUG_NAMED(monitor_namespace_, "Started environment state publishing thread ...");
 
   // publish the full planning scene
-  tesseract_msgs::TesseractState start_msg;
+  tesseract_msgs::EnvironmentState start_msg;
   tesseract_rosutils::toMsg(start_msg, *(env_));
 
   environment_publisher_.publish(start_msg);
@@ -371,7 +360,7 @@ void EnvironmentMonitor::environmentPublishingThread()
 
   do
   {
-    tesseract_msgs::TesseractState msg;
+    tesseract_msgs::EnvironmentState msg;
     bool publish_msg = false;
     ros::Rate rate(publish_environment_frequency_);
     {
@@ -438,7 +427,7 @@ void EnvironmentMonitor::startMonitoringEnvironment(const std::string& monitored
       nh_.serviceClient<tesseract_msgs::GetEnvironmentInformation>(monitored_environment_information_service);
 
   monitored_environment_subscriber_ =
-      nh_.subscribe(monitored_environment_topic, 1000, &EnvironmentMonitor::newTesseractStateCallback, this);
+      nh_.subscribe(monitored_environment_topic, 1000, &EnvironmentMonitor::newEnvironmentStateCallback, this);
   ROS_INFO_NAMED(monitor_namespace_, "Monitoring external environment on '%s'", monitored_environment_topic.c_str());
 }
 
@@ -472,7 +461,7 @@ void EnvironmentMonitor::triggerEnvironmentUpdateEvent(EnvironmentUpdateType upd
   new_environment_update_condition_.notify_all();
 }
 
-void EnvironmentMonitor::newTesseractStateCallback(const tesseract_msgs::TesseractStateConstPtr& env)
+void EnvironmentMonitor::newEnvironmentStateCallback(const tesseract_msgs::EnvironmentStateConstPtr& env)
 {
   EnvironmentUpdateType upd = UPDATE_ENVIRONMENT;
   {
@@ -492,7 +481,7 @@ void EnvironmentMonitor::newTesseractStateCallback(const tesseract_msgs::Tessera
       if (!status || !res.response.success)
       {
         ROS_ERROR_STREAM_NAMED(monitor_namespace_,
-                               "newTesseractStateCallback: Failed to get monitor environment information!");
+                               "newEnvironmentStateCallback: Failed to get monitor environment information!");
         return;
       }
 
@@ -503,20 +492,21 @@ void EnvironmentMonitor::newTesseractStateCallback(const tesseract_msgs::Tessera
       }
       catch (const std::exception& e)
       {
-        ROS_ERROR_NAMED(
-            monitor_namespace_, "newTesseractStateCallback: Failed to convert command history message, %s!", e.what());
+        ROS_ERROR_NAMED(monitor_namespace_,
+                        "newEnvironmentStateCallback: Failed to convert command history message, %s!",
+                        e.what());
         return;
       }
 
       if (!env_->init<tesseract_environment::OFKTStateSolver>(commands))
       {
-        ROS_ERROR_STREAM_NAMED(monitor_namespace_, "newTesseractStateCallback: Failed to initialize environment!");
+        ROS_ERROR_STREAM_NAMED(monitor_namespace_, "newEnvironmentStateCallback: Failed to initialize environment!");
         return;
       }
 
       if (!initialize())
       {
-        ROS_WARN("newTesseractStateCallback: EnvironmentMonitor Failed to initialize!");
+        ROS_WARN("newEnvironmentStateCallback: EnvironmentMonitor Failed to initialize!");
       }
     }
     else
@@ -531,13 +521,13 @@ void EnvironmentMonitor::newTesseractStateCallback(const tesseract_msgs::Tessera
           if (!tesseract_rosutils::processMsg(*env_, res.response.commands))
           {
             ROS_ERROR_STREAM_NAMED(monitor_namespace_,
-                                   "newTesseractStateCallback: Failed to apply monitored environments changes.");
+                                   "newEnvironmentStateCallback: Failed to apply monitored environments changes.");
           }
         }
         else
         {
           ROS_ERROR_STREAM_NAMED(monitor_namespace_,
-                                 "newTesseractStateCallback: Failed to get monitored environments changes.");
+                                 "newEnvironmentStateCallback: Failed to get monitored environments changes.");
         }
       }
       else if (static_cast<int>(env->revision) < env_->getRevision())
@@ -557,20 +547,21 @@ void EnvironmentMonitor::newTesseractStateCallback(const tesseract_msgs::Tessera
                 if (!tesseract_rosutils::processMsg(*env_, res.response.commands))
                 {
                   ROS_ERROR_STREAM_NAMED(monitor_namespace_,
-                                         "newTesseractStateCallback: Failed to apply monitored environments changes.");
+                                         "newEnvironmentStateCallback: Failed to apply monitored environments "
+                                         "changes.");
                 }
               }
               else
               {
                 ROS_ERROR_STREAM_NAMED(monitor_namespace_,
-                                       "newTesseractStateCallback: Failed to get monitored environments changes.");
+                                       "newEnvironmentStateCallback: Failed to get monitored environments changes.");
               }
             }
           }
           else
           {
             ROS_ERROR_STREAM_NAMED(monitor_namespace_,
-                                   "newTesseractStateCallback: Failed to reset the tesseract object!");
+                                   "newEnvironmentStateCallback: Failed to reset the tesseract object!");
           }
         }
         else if (monitored_environment_mode_ == MonitoredEnvironmentMode::SYNCHRONIZED)
@@ -585,19 +576,21 @@ void EnvironmentMonitor::newTesseractStateCallback(const tesseract_msgs::Tessera
             if (!status || !res.response.success)
             {
               ROS_ERROR_STREAM_NAMED(monitor_namespace_,
-                                     "newTesseractStateCallback: Failed to update monitored environment!");
+                                     "newEnvironmentStateCallback: Failed to update monitored environment!");
             }
           }
           else
           {
             ROS_ERROR_STREAM_NAMED(monitor_namespace_,
-                                   "newTesseractStateCallback: Failed to convert latest changes to message and update "
+                                   "newEnvironmentStateCallback: Failed to convert latest changes to message and "
+                                   "update "
                                    "monitored environment!");
           }
         }
         else
         {
-          ROS_ERROR_STREAM_NAMED(monitor_namespace_, "newTesseractStateCallback: Unsupporte MonitoredEnvironmentMode!");
+          ROS_ERROR_STREAM_NAMED(monitor_namespace_,
+                                 "newEnvironmentStateCallback: Unsupporte MonitoredEnvironmentMode!");
         }
       }
       else
@@ -896,6 +889,8 @@ bool EnvironmentMonitor::modifyEnvironmentCallback(tesseract_msgs::ModifyEnviron
 bool EnvironmentMonitor::getEnvironmentChangesCallback(tesseract_msgs::GetEnvironmentChangesRequest& req,
                                                        tesseract_msgs::GetEnvironmentChangesResponse& res)
 {
+  auto lock_read = lockEnvironmentRead();
+
   if (static_cast<int>(req.revision) > env_->getRevision())
   {
     res.success = false;

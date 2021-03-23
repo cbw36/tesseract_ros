@@ -28,8 +28,6 @@
  */
 #include <tesseract_common/macros.h>
 TESSERACT_COMMON_IGNORE_WARNINGS_PUSH
-#include <boost/filesystem.hpp>
-
 #include <OgreEntity.h>
 #include <OgreManualObject.h>
 #include <OgreMaterial.h>
@@ -71,8 +69,7 @@ TESSERACT_COMMON_IGNORE_WARNINGS_POP
 #include "tesseract_rviz/render_tools/joint_widget.h"
 #include "tesseract_rviz/render_tools/link_widget.h"
 #include <tesseract_rviz/conversions.h>
-
-namespace fs = boost::filesystem;
+#include <tesseract_common/types.h>
 
 namespace tesseract_rviz
 {
@@ -364,41 +361,49 @@ LinkWidget::~LinkWidget()
   {
     scene_manager_->destroyEntity(visual_current_mesh);
   }
+  visual_current_meshes_.clear();
 
   for (auto& collision_current_mesh : collision_current_meshes_)
   {
     scene_manager_->destroyEntity(collision_current_mesh);
   }
+  collision_current_meshes_.clear();
 
   for (auto& visual_start_mesh : visual_start_meshes_)
   {
     scene_manager_->destroyEntity(visual_start_mesh);
   }
+  visual_start_meshes_.clear();
 
   for (auto& collision_start_mesh : collision_start_meshes_)
   {
     scene_manager_->destroyEntity(collision_start_mesh);
   }
+  collision_start_meshes_.clear();
 
   for (auto& visual_trajectory_mesh : visual_trajectory_meshes_)
   {
     scene_manager_->destroyEntity(visual_trajectory_mesh);
   }
+  visual_trajectory_meshes_.clear();
 
   for (auto& collision_trajectory_mesh : collision_trajectory_meshes_)
   {
     scene_manager_->destroyEntity(collision_trajectory_mesh);
   }
+  collision_trajectory_meshes_.clear();
 
   for (auto& visual_end_mesh : visual_end_meshes_)
   {
     scene_manager_->destroyEntity(visual_end_mesh);
   }
+  visual_end_meshes_.clear();
 
   for (auto& collision_end_mesh : collision_end_meshes_)
   {
     scene_manager_->destroyEntity(collision_end_mesh);
   }
+  collision_end_meshes_.clear();
 
   for (auto& visual_current_octree : visual_current_octrees_)
   {
@@ -469,7 +474,6 @@ LinkWidget::~LinkWidget()
     scene_manager_->destroyRibbonTrail(trail_);
   }
 
-  delete axes_;
   delete details_;
   delete link_property_;
 }
@@ -723,7 +727,7 @@ Ogre::MaterialPtr LinkWidget::getMaterialForLink(const tesseract_scene_graph::Li
       {
         Ogre::DataStreamPtr stream(new Ogre::MemoryDataStream(res.data.get(), res.size));
         Ogre::Image image;
-        std::string extension = fs::extension(fs::path(filename));
+        std::string extension = tesseract_common::fs::extension(tesseract_common::fs::path(filename));
 
         if (extension[0] == '.')
         {
@@ -745,7 +749,7 @@ Ogre::MaterialPtr LinkWidget::getMaterialForLink(const tesseract_scene_graph::Li
 
     Ogre::Pass* pass = mat->getTechnique(0)->getPass(0);
     Ogre::TextureUnitState* tex_unit = pass->createTextureUnitState();
-    ;
+
     tex_unit->setTextureName(filename);
   }
 
@@ -1464,7 +1468,7 @@ void LinkWidget::updateAxes()
   {
     if (!axes_)
     {
-      axes_ = new rviz::Axes(scene_manager_, env_->getOtherNode(), 0.1f, 0.01f);
+      axes_ = std::make_unique<rviz::Axes>(scene_manager_, env_->getOtherNode(), 0.1f, 0.01f);
       axes_->getSceneNode()->setVisible(getEnabled());
 
       axes_->setPosition(position_property_->getVector());
@@ -1474,10 +1478,7 @@ void LinkWidget::updateAxes()
   else
   {
     if (axes_)
-    {
-      delete axes_;
       axes_ = nullptr;
-    }
   }
 }
 
@@ -1547,13 +1548,15 @@ void LinkWidget::setEndTransform(const Eigen::Isometry3d& transform)
   }
 }
 
-void LinkWidget::setTrajectory(const std::vector<Eigen::Isometry3d>& trajectory)
+void LinkWidget::setTrajectory(const tesseract_common::VectorIsometry3d& trajectory) { trajectory_ = trajectory; }
+
+void LinkWidget::showTrajectory()
 {
-  clearTrajectory();
+  hideTrajectory();
 
   bool enabled = getEnabled() && env_->isVisible() && env_->isTrajectoryVisible();
 
-  size_t trajectory_size = trajectory.size();
+  size_t trajectory_size = trajectory_.size();
   size_t current_size = visual_trajectory_waypoint_nodes_.size();
   if (trajectory_size > current_size)
   {
@@ -1561,7 +1564,7 @@ void LinkWidget::setTrajectory(const std::vector<Eigen::Isometry3d>& trajectory)
     {
       Ogre::Vector3 position;
       Ogre::Quaternion orientation;
-      toOgre(position, orientation, trajectory[i]);
+      toOgre(position, orientation, trajectory_[i]);
       if (i < current_size)
       {
         if (visual_current_node_ != nullptr)
@@ -1617,7 +1620,7 @@ void LinkWidget::setTrajectory(const std::vector<Eigen::Isometry3d>& trajectory)
       {
         Ogre::Vector3 position;
         Ogre::Quaternion orientation;
-        toOgre(position, orientation, trajectory[i]);
+        toOgre(position, orientation, trajectory_[i]);
 
         if (visual_current_node_ != nullptr)
         {
@@ -1653,7 +1656,7 @@ void LinkWidget::setTrajectory(const std::vector<Eigen::Isometry3d>& trajectory)
   }
 }
 
-void LinkWidget::clearTrajectory()
+void LinkWidget::hideTrajectory()
 {
   bool enabled = getEnabled() && env_->isVisible() && env_->isTrajectoryVisible();
 
@@ -1661,8 +1664,8 @@ void LinkWidget::clearTrajectory()
   {
     visual_trajectory_node_->setVisible(false);
     visual_trajectory_node_->setVisible(enabled && env_->isVisualVisible(), false);
-    for (auto&& visual_trajectory_waypoint_visibility : visual_trajectory_waypoint_visibility_)
-      visual_trajectory_waypoint_visibility = false;
+    for (std::size_t i = 0; i < visual_trajectory_waypoint_visibility_.size(); ++i)
+      visual_trajectory_waypoint_visibility_[i] = false;
   }
 
   if (collision_current_node_)
@@ -1670,15 +1673,14 @@ void LinkWidget::clearTrajectory()
     collision_trajectory_node_->setVisible(false);
     collision_trajectory_node_->setVisible(enabled && env_->isCollisionVisible(), false);
     for (size_t i = 0; i < collision_trajectory_waypoint_visibility_.size(); ++i)
-      for (auto&& collision_trajectory_waypoint_visibility : collision_trajectory_waypoint_visibility_)
-        collision_trajectory_waypoint_visibility = false;
+      collision_trajectory_waypoint_visibility_[i] = false;
   }
 }
 
 // This is usefule when wanting to simulate the trajectory
 void LinkWidget::showTrajectoryWaypointOnly(int waypoint)
 {
-  clearTrajectory();
+  hideTrajectory();
 
   size_t idx = static_cast<size_t>(waypoint);
   bool enabled = getEnabled() && env_->isVisible() && env_->isTrajectoryVisible();
@@ -1694,6 +1696,27 @@ void LinkWidget::showTrajectoryWaypointOnly(int waypoint)
     collision_trajectory_waypoint_nodes_[idx]->setVisible(enabled && env_->isCollisionVisible());
     collision_trajectory_waypoint_visibility_[idx] = enabled;
   }
+}
+
+void LinkWidget::clearTrajectory()
+{
+  for (auto& visual_trajectory_mesh : visual_trajectory_meshes_)
+  {
+    scene_manager_->destroyEntity(visual_trajectory_mesh);
+  }
+  visual_trajectory_meshes_.clear();
+
+  for (auto& collision_trajectory_mesh : collision_trajectory_meshes_)
+  {
+    scene_manager_->destroyEntity(collision_trajectory_mesh);
+  }
+  collision_trajectory_meshes_.clear();
+
+  scene_manager_->destroySceneNode(visual_trajectory_node_);
+  scene_manager_->destroySceneNode(collision_trajectory_node_);
+
+  visual_trajectory_node_ = env_->getVisualNode()->createChildSceneNode();
+  collision_trajectory_node_ = env_->getCollisionNode()->createChildSceneNode();
 }
 
 void LinkWidget::setToErrorMaterial()
@@ -1782,6 +1805,8 @@ void LinkWidget::setParentProperty(rviz::Property* new_parent)
 
   if (new_parent)
     new_parent->addChild(link_property_);
+
+  link_property_->setParent(new_parent);
 }
 
 void LinkWidget::setCollisionEnabled(bool enabled)
@@ -1804,6 +1829,7 @@ void LinkWidget::removeAllowedCollision(const std::string& link_name)
     return;
 
   allowed_collision_matrix_property_->takeChild(it->second);
+  it->second->setParent(nullptr);
   delete it->second;
   acm_.erase(link_name);
 }

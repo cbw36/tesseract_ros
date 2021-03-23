@@ -18,7 +18,7 @@ find_package(tesseract_environment REQUIRED)
 find_package(tesseract_common REQUIRED)
 find_package(tesseract_visualization REQUIRED)
 find_package(Eigen3 REQUIRED)
-find_package(cmake_common_scripts REQUIRED)
+find_package(ros_industrial_cmake_boilerplate REQUIRED)
 
 # Ogre
 find_package(PkgConfig REQUIRED)
@@ -92,6 +92,7 @@ include_directories(
 qt_wrap_cpp(${PROJECT_NAME}_render_tools_cpp_MOCS
   include/tesseract_rviz/render_tools/trajectory_panel.h
   include/tesseract_rviz/render_tools/visualization_widget.h
+  include/tesseract_rviz/render_tools/visualize_trajectory_widget.h
   include/tesseract_rviz/render_tools/link_widget.h
   include/tesseract_rviz/render_tools/joint_widget.h
   include/tesseract_rviz/render_tools/joint_state_monitor_widget.h
@@ -105,6 +106,7 @@ qt_wrap_cpp(${PROJECT_NAME}_render_tools_cpp_MOCS
 
 add_library(${PROJECT_NAME}_render_tools SHARED
   src/render_tools/visualization_widget.cpp
+  src/render_tools/visualize_trajectory_widget.cpp
   src/render_tools/joint_widget.cpp
   src/render_tools/link_widget.cpp
   src/render_tools/trajectory_panel.cpp
@@ -159,9 +161,9 @@ target_compile_definitions(${PROJECT_NAME}_render_tools PUBLIC $ENV{ROS_DISTRO}_
 #target_link_libraries(${PROJECT_NAME}_scene_plugin ${PROJECT_NAME}_scene_plugin_core ${catkin_LIBRARIES} ${Boost_LIBRARIES})
 
 # Trajectory State Disply
-qt_wrap_cpp(${PROJECT_NAME}_state_plugin_core_cpp_MOCS include/tesseract_rviz/tesseract_state_plugin/tesseract_state_display.h)
+qt_wrap_cpp(${PROJECT_NAME}_state_plugin_core_cpp_MOCS include/tesseract_rviz/environment_state_plugin/environment_state_display.h)
 
-add_library(${PROJECT_NAME}_state_plugin_core SHARED src/tesseract_state_plugin/tesseract_state_display.cpp ${${PROJECT_NAME}_state_plugin_core_cpp_MOCS})
+add_library(${PROJECT_NAME}_state_plugin_core SHARED src/environment_state_plugin/environment_state_display.cpp ${${PROJECT_NAME}_state_plugin_core_cpp_MOCS})
 target_link_libraries(${PROJECT_NAME}_state_plugin_core PUBLIC
     ${PROJECT_NAME}_render_tools
     ${catkin_LIBRARIES}
@@ -180,7 +182,7 @@ target_include_directories(${PROJECT_NAME}_state_plugin_core SYSTEM PUBLIC
     ${OGRE_INCLUDE_DIRS}
     ${EIGEN3_INCLUDE_DIRS})
 
-add_library(${PROJECT_NAME}_state_plugin SHARED src/tesseract_state_plugin/plugin_init.cpp)
+add_library(${PROJECT_NAME}_state_plugin SHARED src/environment_state_plugin/plugin_init.cpp)
 target_link_libraries(${PROJECT_NAME}_state_plugin PRIVATE ${PROJECT_NAME}_state_plugin_core ${catkin_LIBRARIES} ${Boost_LIBRARIES})
 target_compile_options(${PROJECT_NAME}_state_plugin PUBLIC ${TESSERACT_COMPILE_OPTIONS})
 target_cxx_version(${PROJECT_NAME}_state_plugin PUBLIC VERSION 17)
